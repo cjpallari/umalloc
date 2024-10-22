@@ -30,5 +30,7 @@ int umeminit(size_t sizeOfRegion, int allocationAlgo)
 
 int main()
 {
+    size_t page_size = getpagesize();
+    printf("Page size: %zu\n", page_size);
     return 0;
 }
