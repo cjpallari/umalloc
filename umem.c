@@ -3,12 +3,14 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "umem.h"
 #define MIN_BLOCK_SIZE 32
 
 node_t *list_head = NULL;
 node_t *small_free = NULL;
 header_t *header = NULL;
+node_t *last_allocation = NULL;
 static int allocationAlgo;
 int num_allocs = 0;
 int num_deallocs = 0;
@@ -19,46 +21,40 @@ float fragmentation = 0.0;
 void print_free_list()
 {
     node_t *current = list_head;
-    int count = 0; // Add a safeguard for infinite loops
-    while (current != NULL && count < 100)
-    { // Limit to 100 iterations
+    printf("Free list: ");
+
+    while (current != NULL)
+    {
         printf("Block of size %zu -> ", current->size);
         current = current->next;
-        count++;
-    }
-    if (count >= 100)
-    {
-        printf("Warning: Too many iterations, possibly a circular list.\n");
     }
     printf("NULL\n");
 }
 
 int umeminit(size_t sizeOfRegion, int algo)
 {
-
     if (list_head != NULL)
     {
         return 0;
     }
 
     allocationAlgo = algo;
-    // open the /dev/zero device
     int fd = open("/dev/zero", O_RDWR);
 
-    // sizeOfRegion (in bytes) needs to be evenly divisible by the page size
     void *allocated_memory = mmap(NULL, sizeOfRegion, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
     if (allocated_memory == MAP_FAILED)
     {
         perror("mmap");
         exit(1);
     }
+
+    // set list head and size
     list_head = (node_t *)allocated_memory;
     list_head->size = sizeOfRegion;
+    list_head->next = NULL; // set next to null
+    // setting this for stat purposes
     current_free = sizeOfRegion;
-    list_head->next = NULL;
-    // header->magic = MAGIC;
 
-    // close the device (don't worry, mapping should be unaffected)
     close(fd);
     return 0;
 }
@@ -66,113 +62,128 @@ int umeminit(size_t sizeOfRegion, int algo)
 void *allocate_block(node_t *block, size_t size)
 {
 
-    size_t rounded_size = size + sizeof(header_t);          // this will be the size of the block we are allocating
-    size_t remaining_size = list_head->size - rounded_size; // this will be the size of the remaining free list
+    size_t rounded_size = size + sizeof(header_t);
+    size_t remaining_size = block->size - rounded_size;
 
+    // save the next pointer before modifying the block
+    node_t *saved_next = block->next;
+
+    // now set the magic number
     ((header_t *)block)->magic = MAGIC;
 
-    if (remaining_size >= sizeof(node_t)) // Ensure we have the minimum space remaining in the free list for future allocations
+    // handles block splitting
+    if (remaining_size >= sizeof(node_t)) // should i be adding 8 bytes to this as well?
     {
+        // create a new block at the end of the allocated block
         node_t *new_node = (node_t *)((char *)block + rounded_size);
-        new_node->size = remaining_size; // Set the size of the new block
-        block->size = rounded_size;
-        list_head = new_node;
+        new_node->size = remaining_size;
 
-        // printf("Created new block at %p with size %zu\n", list_head, list_head->size);
+        // if the block we're splitting is the head of the free list
+        if (block == list_head)
+        {
+            new_node->next = saved_next; // Use saved_next pointer
+            list_head = new_node;
+        }
+        else
+        {
+            new_node->next = saved_next; // Use saved_next pointer
+
+            // set previous node to list head
+            node_t *prev = list_head;
+            // keep searching utnil we find block that points to our target
+            while (prev && prev->next != block)
+            {
+                prev = prev->next;
+            }
+            // if we find it, connect it to our new free block
+            if (prev)
+            {
+                prev->next = new_node;
+            }
+        }
+
+        // set the size of the allocated block
+        block->size = rounded_size;
     }
+    // if block is not big enough to split
     else
     {
-        // No split possible, so we remove the block from the free list
-        if (list_head == block)
+        // remove the whole block from the list
+        if (block == list_head)
         {
-            list_head = block->next;
+            list_head = saved_next; // use saved_next pointer
         }
         else
         {
             node_t *prev = list_head;
-            while (prev->next != block)
+            while (prev && prev->next != block)
             {
                 prev = prev->next;
             }
-            prev->next = block->next;
+            if (prev)
+            {
+                prev->next = saved_next; // use saved_next pointer
+            }
         }
-        printf("Block removed: block->size = %zu\n", block->size);
     }
+
+    // update stats
     current_allocated += rounded_size;
     current_free -= rounded_size;
     num_allocs++;
-    // print_free_list();
-    return (void *)((char *)block + sizeof(header_t)); // Return pointer to the allocated memory
+
+    return (void *)((char *)block + sizeof(header_t));
 }
 
 void *best(size_t size)
 {
-    // Calculate the total size needed including header and alignment
+    // 8 byte alignment
     size_t required_size = ((size + sizeof(header_t) + 7) / 8) * 8;
-
     node_t *current = list_head;
     node_t *best_fit = NULL;
 
-    printf("\nBEST FIT searching for size: %zu\n", required_size);
-
-    // Traverse the linked list until we hit a null value
+    // traverse free list
     while (current != NULL)
     {
-        printf("Checking block of size: %zu\n", current->size);
-
+        // if the block is bigger than the size request aligned for 8 bytes
         if (current->size >= required_size)
         {
-            if (best_fit == NULL || current->size < best_fit->size)
+            // if we haven't found a block yet or the current block is smaller than the best fit
+            if (best_fit == NULL ||
+                current->size < best_fit->size ||
+                (current->size == best_fit->size && current < best_fit))
             {
+                // set the best fit to the current block
                 best_fit = current;
-                printf("Found new best fit of size: %zu\n", best_fit->size);
             }
         }
         current = current->next;
     }
 
+    // if we found a block return it
     if (best_fit != NULL)
     {
-        printf("Selected best fit block of size: %zu for request of size: %zu\n",
-               best_fit->size, required_size);
+
         return allocate_block(best_fit, size);
     }
     return NULL;
 }
 
-// void *best(size_t size)
-// {
-//     node_t *current = list_head;
-//     node_t *best_fit = NULL;
-
-//     // Traverse the linked list until we hit a null value, updating the best_fit variable as we go
-//     while (current != NULL)
-//     {
-//         if (current->size >= size)
-//         {
-//             if (best_fit == NULL || current->size < best_fit->size)
-//             {
-//                 best_fit = current;
-//             }
-//         }
-//         current = current->next;
-//     }
-//     if (best_fit != NULL)
-//     {
-//         return allocate_block(best_fit, size);
-//     }
-//     return NULL;
-// }
-
 void *worst(size_t size)
 {
+
+    // 8 byte alignment
+    size_t required_size = ((size + sizeof(header_t) + 7) / 8) * 8;
     node_t *current = list_head;
     node_t *worst_fit = NULL;
 
+    // traverse free list
     while (current != NULL)
     {
-        if (current->size >= size)
+        // if the block is bigger than the size request aligned for 8 bytes
+        if (current->size >= required_size)
         {
+            // if we haven't found a block yet or the current block is bigger than the worst fit
             if (worst_fit == NULL || current->size > worst_fit->size)
             {
                 worst_fit = current;
@@ -180,26 +191,35 @@ void *worst(size_t size)
         }
         current = current->next;
     }
+    // if we found a block return it
     if (worst_fit != NULL)
     {
         return allocate_block(worst_fit, size);
     }
+    return NULL;
 }
 
 void *first(size_t size)
 {
+    // 8 byte alignment
+    size_t required_size = ((size + sizeof(header_t) + 7) / 8) * 8;
     node_t *current = list_head;
     node_t *first = NULL;
 
+    // traverse free list
     while (current != NULL)
     {
-        if (current->size >= size)
+        // if the block is bigger than the size request aligned for 8 bytes
+        if (current->size >= required_size)
         {
+            // set the first block that fits the size
             first = current;
             break;
         }
         current = current->next;
     }
+
+    // if we found a block return it
     if (first != NULL)
     {
         return allocate_block(first, size);
@@ -207,44 +227,94 @@ void *first(size_t size)
     return NULL;
 }
 
-// void *next(size_t size)
-// {
-//     if (list_head == NULL)
-//         return NULL;
-
-//     // Start from last allocation point or beginning if not set
-//     node_t *start = last_allocation ? last_allocation : list_head;
-//     node_t *current = start;
-
-//     // Search from current position to end
-//     do
-//     {
-//         if (current->size >= size)
-//         {
-//             last_allocation = current->next ? current->next : list_head;
-//             return allocate_block(current, size);
-//         }
-//         current = current->next ? current->next : list_head;
-//     } while (current != start);
-
-//     return NULL;
-// }
-
 void *next(size_t size)
 {
-    // do something
+
+    // 8 byte alignment
+    size_t required_size = ((size + sizeof(header_t) + 7) / 8) * 8;
+
+    if (list_head == NULL)
+        return NULL;
+
+    // if last_allocation is NULL or no longer in the free list, start from head
+    if (last_allocation == NULL)
+    {
+        last_allocation = list_head;
+    }
+    else
+    {
+        // check if last_allocation is still in the free list
+        node_t *check = list_head;
+        bool found = false;
+        while (check != NULL)
+        {
+            // if list head is the last block we allocated
+            if (check == last_allocation)
+            {
+                found = true;
+                break;
+            }
+            check = check->next;
+        }
+        // if we don't find the last allocation in the free list, set it to the head
+        if (!found)
+        {
+            last_allocation = list_head;
+        }
+    }
+
+    node_t *start = last_allocation;
+    node_t *current = start;
+
+    do
+    {
+
+        // checking to see what the last allocation was
+        // if the current block is big enough for our request
+        if (current->size >= required_size)
+        {
+            // save where to start next search before we modify the block
+            if (current->next != NULL)
+            {
+                last_allocation = current->next;
+            }
+            else
+            {
+                last_allocation = list_head;
+            }
+
+            return allocate_block(current, size);
+        }
+
+        // if there's a next block then move to it, otherwise current is the head
+        if (current->next != NULL)
+        {
+            current = current->next;
+        }
+        else
+        {
+            current = list_head;
+        }
+
+    } while (current != start);
+
+    // if we get here, we've gone through the whole list without finding space
+    last_allocation = NULL; // Reset for next time
+    return NULL;
 }
 
 void *umalloc(size_t size)
 {
     void *allocated_memory = NULL;
+    // 8 byte alignment
     size_t aligned_size = ((size + 7) / 8) * 8;
 
-    if (aligned_size == 0)
+    if (aligned_size == 0) // handle 0 size
     {
         return NULL;
     }
 
+    // determine which algorithm we use
     switch (allocationAlgo)
     {
     case BEST_FIT:
@@ -262,16 +332,11 @@ void *umalloc(size_t size)
     default:
         return NULL;
     }
-    // bytes_allocated += size;
 
+    // set header if allocation was successful
     if (allocated_memory != NULL)
     {
-        // If necessary, you could store allocated blocks in a separate list or process them here
         header_t *allocated_header = (header_t *)((char *)allocated_memory - sizeof(header_t));
-
-        // num_allocs++;
-        // current_allocated += aligned_size;
-        // current_free -= aligned_size;
     }
     return allocated_memory;
 }
@@ -305,44 +370,96 @@ float calculate_fragmentation()
     return fragmentation;
 }
 
-void ufree(void *ptr)
+void validate_free_ptr(void *ptr, header_t *header)
 {
-    if (ptr == NULL)
-    {
-        return;
-    }
-
-    // Get the header that precedes the user's pointer
-    header_t *header = (header_t *)((char *)ptr - sizeof(header_t));
-
     if (header->magic != MAGIC)
     {
         fprintf(stderr, "Error: Memory corruption detected at block %p\n", ptr);
         exit(1);
     }
+    node_t *check = list_head;
+    while (check != NULL)
+    {
+        if ((void *)check == (void *)header)
+        {
+            fprintf(stderr, "Error: Double free detected at block %p\n", ptr);
+            exit(1);
+        }
+        check = check->next;
+    }
+}
 
-    size_t size_to_free = header->size;
-
-    // Update statistics
+void update_free_stats(size_t size_to_free)
+{
     current_free += size_to_free;
     current_allocated -= size_to_free;
     num_deallocs += 1;
+}
 
-    // Convert the freed memory into a free list node
+void merge_with_next_blocks(node_t *current)
+{
+    while (current->next != NULL &&
+           (char *)current + current->size == (char *)current->next)
+    {
+        current->size += current->next->size;
+        current->next = current->next->next;
+    }
+}
+
+void insert_block(node_t *free_block, node_t *current, node_t *prev)
+{
+    if (prev == NULL)
+    {
+        free_block->next = list_head;
+        list_head = free_block;
+    }
+    else
+    {
+        prev->next = free_block;
+        free_block->next = current;
+    }
+}
+
+node_t *init_free_block(header_t *header, size_t size)
+{
     node_t *free_block = (node_t *)header;
-    free_block->size = size_to_free;
+    free_block->size = size;
     free_block->next = NULL;
+    return free_block;
+}
 
-    // If the free list is empty, make this the first block
+void ufree(void *ptr)
+{
+    if (ptr == NULL)
+        return;
+
+    header_t *header = (header_t *)((char *)ptr - sizeof(header_t));
+    validate_free_ptr(ptr, header);
+
+    node_t *check = list_head;
+    while (check != NULL)
+    {
+        if ((void *)check == (void *)header)
+        {
+            fprintf(stderr, "Error: Double free detected at block %p\n", ptr);
+            exit(1);
+        }
+        check = check->next;
+    }
+
+    size_t size_to_free = header->size;
+    update_free_stats(size_to_free);
+
+    node_t *free_block = init_free_block(header, size_to_free);
+
     if (list_head == NULL)
     {
         list_head = free_block;
         calculate_fragmentation();
-        print_free_list();
+
         return;
     }
 
-    // Find where to insert the block and handle merging
     node_t *current = list_head;
     node_t *prev = NULL;
 
@@ -351,30 +468,18 @@ void ufree(void *ptr)
         // Check if we can merge with the previous block
         if ((char *)current + current->size == (char *)free_block)
         {
-            // printf("Previous block -> Current: %p, size: %zu, end: %p\n",
-            //        current, current->size, (char *)current + current->size);
-            // printf("Free block address: %p\n", free_block);
-            // current->size += free_block->size;
+            current->size += free_block->size;
 
-            // Now check if we can also merge with the next block
-            if (current->next != NULL &&
-                (char *)current + current->size == (char *)current->next)
-            {
-                current->size += current->next->size;
-                current->next = current->next->next;
-            }
-
+            // Check if we can also merge with the next block
+            merge_with_next_blocks(current);
             calculate_fragmentation();
-            print_free_list();
+
             return;
         }
 
         // Check if we can merge with the next block
         if ((char *)free_block + free_block->size == (char *)current)
         {
-            // printf("free_block address: %p, size: %zu, end: %p\n",
-            //        free_block, free_block->size, (char *)free_block + free_block->size);
-            // printf("current block address: %p\n", current);
             free_block->size += current->size;
             free_block->next = current->next;
 
@@ -387,28 +492,24 @@ void ufree(void *ptr)
                 prev->next = free_block;
             }
 
+            // After merging with next, check if we can merge with previous
+            if (prev != NULL && (char *)prev + prev->size == (char *)free_block)
+            {
+                prev->size += free_block->size;
+                prev->next = free_block->next;
+            }
+
             calculate_fragmentation();
-            print_free_list();
+
             return;
         }
 
-        // If we can't merge, find the correct position to insert
-        // Keep the free list ordered by address
+        // Insert in address order if no merging is possible
         if ((char *)free_block < (char *)current)
         {
-            if (prev == NULL)
-            {
-                free_block->next = list_head;
-                list_head = free_block;
-            }
-            else
-            {
-                prev->next = free_block;
-                free_block->next = current;
-            }
-
+            insert_block(free_block, current, prev);
             calculate_fragmentation();
-            print_free_list();
+
             return;
         }
 
@@ -416,11 +517,47 @@ void ufree(void *ptr)
         current = current->next;
     }
 
-    // If we get here, add to the end of the list
+    // Add to end if we get here
     prev->next = free_block;
-
     calculate_fragmentation();
-    print_free_list();
+}
+
+void validate_realloc_ptr(void *ptr, header_t *header)
+{
+    if (header->magic != MAGIC)
+    {
+        fprintf(stderr, "Error: Memory corruption detected at block %p\n", ptr);
+        exit(1);
+    }
+}
+
+void shrink_block(header_t *current_header, size_t aligned_new_size, size_t old_size)
+{
+    node_t *new_free_block = (node_t *)((char *)current_header + aligned_new_size);
+    new_free_block->size = old_size - aligned_new_size;
+    new_free_block->next = NULL;
+    current_header->size = aligned_new_size;
+
+    current_allocated -= new_free_block->size;
+    current_free += new_free_block->size;
+
+    // Add to free list in order
+    if (list_head == NULL || (char *)list_head > (char *)new_free_block)
+    {
+        new_free_block->next = list_head;
+        list_head = new_free_block;
+    }
+    else
+    {
+        node_t *current = list_head;
+        while (current->next != NULL &&
+               (char *)current->next < (char *)new_free_block)
+        {
+            current = current->next;
+        }
+        new_free_block->next = current->next;
+        current->next = new_free_block;
+    }
 }
 
 void *urealloc(void *ptr, size_t new_size)
@@ -436,58 +573,26 @@ void *urealloc(void *ptr, size_t new_size)
         return NULL;
     }
 
-    // Get the header for the current block
+    // get the header for the current block
     header_t *current_header = (header_t *)((char *)ptr - sizeof(header_t));
 
-    if (current_header->magic != MAGIC)
-    {
-        fprintf(stderr, "Error: Memory corruption detected at block %p\n", ptr);
-        exit(1);
-    }
+    validate_realloc_ptr(ptr, current_header);
 
     size_t old_size = current_header->size;
     size_t aligned_new_size = ((new_size + sizeof(header_t) + 7) / 8) * 8;
 
-    // If the new size is smaller or equal, we can shrink or just return the pointer
+    // if the new size is smaller or equal, we can shrink or just return the pointer
     if (aligned_new_size <= old_size)
     {
-        // Shrinking logic remains the same
+        // shrinking the block
         if (aligned_new_size + sizeof(node_t) <= old_size)
         {
-            node_t *new_free_block = (node_t *)((char *)current_header + aligned_new_size);
-            new_free_block->size = old_size - aligned_new_size;
-            new_free_block->next = NULL;
-            current_header->size = aligned_new_size;
-
-            current_allocated -= new_free_block->size;
-            current_free += new_free_block->size;
-
-            // Add to free list in order
-            if (list_head == NULL || (char *)list_head > (char *)new_free_block)
-            {
-                new_free_block->next = list_head;
-                list_head = new_free_block;
-            }
-            else
-            {
-                node_t *current = list_head;
-                while (current->next != NULL &&
-                       (char *)current->next < (char *)new_free_block)
-                {
-                    current = current->next;
-                }
-                new_free_block->next = current->next;
-                current->next = new_free_block;
-            }
+            shrink_block(current_header, aligned_new_size, old_size);
         }
         return ptr;
     }
 
-    // If the new size is larger, we need to:
-    // 1. Free the old block first (so it can potentially merge with adjacent blocks)
-    // 2. Then try to allocate the new size (which might use the newly merged space)
-
-    // Save the data before freeing
+    // save the data before freeing
     char saved_data[old_size - sizeof(header_t)];
     char *old_data = (char *)ptr;
     for (size_t i = 0; i < old_size - sizeof(header_t); i++)
@@ -495,15 +600,15 @@ void *urealloc(void *ptr, size_t new_size)
         saved_data[i] = old_data[i];
     }
 
-    // Free the old block first
+    // free the old block first
     ufree(ptr);
 
-    // Now allocate new block (might use merged space)
+    // allocate new block
     void *new_ptr = umalloc(new_size);
     if (new_ptr == NULL)
     {
-        // Allocation failed - need to restore old state
-        // We'll need to reallocate the old block
+        // allocation failed - need to restore old state
+        // need to reallocate the old block
         void *restored_ptr = umalloc(old_size - sizeof(header_t));
         if (restored_ptr != NULL)
         {
@@ -516,7 +621,7 @@ void *urealloc(void *ptr, size_t new_size)
         return restored_ptr;
     }
 
-    // Copy saved data to new block
+    // copy saved data to new block
     char *new_data = (char *)new_ptr;
     for (size_t i = 0; i < old_size - sizeof(header_t); i++)
     {
@@ -524,4 +629,15 @@ void *urealloc(void *ptr, size_t new_size)
     }
 
     return new_ptr;
+}
+
+void reset_values()
+{
+    num_allocs = 0;
+    num_deallocs = 0;
+    current_allocated = 0;
+    current_free = 0;
+    fragmentation = 0.0;
+    list_head = NULL;
+    last_allocation = NULL;
 }

@@ -7,282 +7,454 @@ void basic_first_fit_test()
     printf("\n=== Testing FIRST_FIT Algorithm ===\n");
     umeminit(4096, FIRST_FIT);
 
-    printf("Initial free list:\n");
+    // test 1: Allocate some memory blocks and free them
+    void *ptr1 = umalloc(512);
+    void *ptr2 = umalloc(1024);
+    void *ptr3 = umalloc(256);
+
+    // test 2: Free the allocated blocks
+    ufree(ptr1);
+    ufree(ptr2);
+    ufree(ptr3);
+
+    // test 3: Allocate again after freeing
+    void *ptr4 = umalloc(128); // should allocate block size of 144
+    void *ptr5 = umalloc(256); // should allocate block size of 272
+
+    // resulting total allocated memory should be 416 bytes
+
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n");
+    printf("=========================================");
+    printf("\n");
+}
+
+void intensive_first_fit_test()
+{
+    printf("\n=== Intensive Testing of FIRST_FIT Algorithm ===\n");
+    umeminit(4096, FIRST_FIT);
+
+    void *ptr1 = umalloc(123);
+    void *ptr2 = umalloc(507);
+    void *ptr3 = umalloc(221);
+    void *ptr4 = umalloc(1031); // Prime number
+    void *ptr5 = umalloc(249);
+    void *ptr6 = umalloc(61); // Prime number
+
+    // Test realloc with odd sizes
+    ptr1 = urealloc(ptr1, 187);
+    ptr4 = urealloc(ptr4, 1503);
+
+    ufree(ptr2);
+    ufree(ptr3);
+
+    void *ptr7 = umalloc(513);
+    void *ptr8 = umalloc(127);  // One less than power of 2
+    void *ptr9 = umalloc(1025); // One more than power of 2
+
+    ufree(ptr1);
+    ufree(ptr5);
+
+    void *ptr10 = umalloc(129); // One more than power of 2
+    void *ptr11 = umalloc(511); // One less than power of 2
+    void *ptr12 = umalloc(255); // One less than power of 2
+
+    // Free everything except ptr13-16
+    ufree(ptr4);
+    ufree(ptr6);
+    ufree(ptr7);
+    ufree(ptr8);
+    ufree(ptr9);
+    ufree(ptr10);
+    ufree(ptr11);
+    ufree(ptr12);
+
+    void *ptr13 = umalloc(17); // Prime number
+    void *ptr14 = umalloc(3);  // Prime number
+    void *ptr15 = umalloc(25);
+    void *ptr16 = umalloc(1023); // One less than power of 2
+
+    ufree(ptr14);
+
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n=========================================\n");
+}
+
+// void basic_best_fit_test()
+// {
+//     printf("=== Testing BEST_FIT Algorithm ===\n");
+//     umeminit(4096, BEST_FIT);
+
+//     // Allocate several blocks
+//     int *ptr1 = umalloc(256);
+//     int *ptr2 = umalloc(128); // Best fit should choose a smaller block if available
+//     int *ptr3 = umalloc(512); // Allocate a larger block
+
+//     // Free some blocks
+//     ufree(ptr2);
+//     ufree(ptr1);
+
+//     // Allocate again after some deallocations
+//     int *ptr4 = umalloc(150);
+//     int *ptr5 = umalloc(100);
+
+//     // Final cleanup
+//     ufree(ptr3);
+//     ufree(ptr4);
+//     ufree(ptr5);
+//     printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+//     printf("\n");
+//     printf("=========================================");
+//     printf("\n");
+// }
+
+void basic_best_fit_test()
+{
+    printf("\n=== Basic BEST_FIT Test ===\n");
+    umeminit(1000, BEST_FIT); // Small size for easier tracking
+
+    // Test 1: Basic allocations
+    printf("\nTest 1 - Basic allocations:\n");
+    void *ptr1 = umalloc(50);  // Not aligned
+    void *ptr2 = umalloc(64);  // Already aligned
+    void *ptr3 = umalloc(100); // Not aligned
+
+    printf("ptr1 (50): %p\n", ptr1);
+    printf("ptr2 (64): %p\n", ptr2);
+    printf("ptr3 (100): %p\n", ptr3);
     print_free_list();
 
-    // Test 1: Allocate some memory blocks and free them
-    void *ptr1 = umalloc(512);  // Allocate 512 bytes
-    void *ptr2 = umalloc(1024); // Allocate 1024 bytes
-    void *ptr3 = umalloc(256);  // Allocate 256 bytes
+    // Test 2: Free middle block and try new allocation
+    printf("\nTest 2 - Free middle block:\n");
+    ufree(ptr2);
+    print_free_list();
 
-    // Print the allocated blocks (for debugging)
-    printf("Allocated pointers: %p, %p, %p\n", ptr1, ptr2, ptr3);
+    // Should use ptr2's space if alignment is working correctly
+    void *ptr4 = umalloc(60); // Not aligned
+    printf("ptr4 (60): %p\n", ptr4);
+    print_free_list();
 
-    // Test 2: Free the allocated blocks
-    ufree(ptr1); // Free the first block
-    ufree(ptr2); // Free the second block
-    ufree(ptr3); // Free the third block
-
-    // Test 3: Allocate again after freeing
-    void *ptr4 = umalloc(128); // Allocate 128 bytes
-    void *ptr5 = umalloc(256); // Allocate 256 bytes
+    // Clean up
+    ufree(ptr1);
+    ufree(ptr3);
+    ufree(ptr4);
+    print_free_list();
 
     printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
 }
 
-void basic_best_fit_test()
+void basic_next_fit_test()
 {
-    printf("=== Testing BEST_FIT Algorithm ===\n");
+    printf("\n=== Testing NEXT_FIT Algorithm ===\n");
+    umeminit(4096, NEXT_FIT);
 
-    // Initialize memory pool (e.g., 4096 bytes, best fit strategy)
-    umeminit(4096, BEST_FIT);
+    printf("Initial free list:\n");
 
-    // Allocate several blocks
-    int *ptr1 = umalloc(256); // Should allocate from the first fit
-    int *ptr2 = umalloc(128); // Best fit should choose a smaller block if available
-    int *ptr3 = umalloc(512); // Allocate a larger block
+    // test 1: Allocate memory blocks in sequence
+    void *ptr1 = umalloc(100);
+    void *ptr2 = umalloc(200);
+    void *ptr3 = umalloc(300);
 
-    printf("Allocated pointers: %p, %p, %p\n", ptr1, ptr2, ptr3);
+    // test 2: free in different order
+    ufree(ptr2);
 
-    // Free some blocks
-    ufree(ptr2); // Free the smaller block
-    ufree(ptr1); // Free another block
+    ufree(ptr1); // free first block - should coalesce
 
-    // Allocate again after some deallocations
-    int *ptr4 = umalloc(150); // Should use the best fit block for size 150
-    int *ptr5 = umalloc(100); // Allocate another smaller block
+    // test 3: Allocate with wrap-around
+    void *ptr4 = umalloc(150); // Should use coalesced space
+    void *ptr5 = umalloc(50);  // Should use remaining space
 
-    // Print the current state of the free list (to verify best fit allocation)
-    printf("Free list after allocations and deallocations:\n");
-    print_free_list(); // Assuming you have a function to print free list for debugging
-
-    // Final cleanup
+    // test 4: Free all and verify coalescing
     ufree(ptr3);
     ufree(ptr4);
     ufree(ptr5);
+
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n");
+    printf("=========================================");
+    printf("\n");
+}
+
+void intensive_best_fit_test()
+{
+    printf("\n=== Intensive Testing of BEST_FIT Algorithm ===\n");
+    umeminit(4096, BEST_FIT);
+
+    // malloc with odd sizes
+    void *ptr1 = umalloc(509);
+    void *ptr2 = umalloc(1027);
+    void *ptr3 = umalloc(253);
+    void *ptr4 = umalloc(129);
+    void *ptr5 = umalloc(65);
+    void *ptr6 = umalloc(519);
+    void *ptr7 = umalloc(251);
+    void *ptr8 = umalloc(127);
+    void *ptr9 = umalloc(61);
+    void *ptr10 = umalloc(131);
+
+    // free some blocks
+    ufree(ptr1);
+    ufree(ptr3);
+    ufree(ptr5);
+    ufree(ptr7);
+    ufree(ptr9);
+
+    // try to realloc some blocks with odd sizes
+    ptr2 = urealloc(ptr2, 1503);
+    ptr4 = urealloc(ptr4, 95);
+    ptr6 = urealloc(ptr6, 777);
+
+    // malloc with odd sizes
+    void *ptr11 = umalloc(63);
+    void *ptr12 = umalloc(135);
+    void *ptr13 = umalloc(507);
+
+    ufree(ptr11);
+    ufree(ptr13);
+
+    // malloc with odd sizes
+    void *ptr14 = umalloc(123);
+    void *ptr15 = umalloc(249);
+
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n=========================================\n");
+}
+
+void next_fit_edge_test()
+{
+    printf("\n=== Testing NEXT_FIT Edge Cases ===\n");
+    umeminit(4096, NEXT_FIT);
+
+    // test 1: Fill most of memory, leaving small gaps
+    void *ptr1 = umalloc(2000);
+    void *ptr2 = umalloc(1000);
+    void *ptr3 = umalloc(500);
+
+    // test 2: Free middle block and try to allocate something larger
+    ufree(ptr2);
+    void *ptr4 = umalloc(1200);
+
+    // test 3: Try to allocate remaining space
+    printf("\nAllocating remaining space:\n");
+    void *ptr5 = umalloc(100);
+
+    // Clean up
+    ufree(ptr1);
+    ufree(ptr3);
+    ufree(ptr4);
+    ufree(ptr5);
+
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n");
+    printf("=========================================");
+    printf("\n");
+}
+
+void intensive_next_fit_test()
+{
+    printf("\n=== Intensive Testing of NEXT_FIT Algorithm ===\n");
+    umeminit(4096, NEXT_FIT);
+
+    // dd sizes to test alignment
+    void *ptr1 = umalloc(511);
+    void *ptr2 = umalloc(1023);
+    void *ptr3 = umalloc(255);
+    void *ptr4 = umalloc(517);
+    void *ptr5 = umalloc(127);
+    void *ptr6 = umalloc(67);
+    void *ptr7 = umalloc(259);
+    void *ptr8 = umalloc(127);
+    void *ptr9 = umalloc(63);
+    void *ptr10 = umalloc(129);
+
+    // free some blocks
+    ufree(ptr1);
+    ufree(ptr3);
+    ufree(ptr5);
+    ufree(ptr7);
+    ufree(ptr9);
+
+    // malloc again with random sizes
+    void *ptr11 = umalloc(61);
+    void *ptr12 = umalloc(133);
+    void *ptr13 = umalloc(511);
+
+    // free some more blocks
+    ufree(ptr11);
+    ufree(ptr13);
+
+    // malloc again with random sizes
+    void *ptr14 = umalloc(125);
+    void *ptr15 = umalloc(257);
+
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n=========================================\n");
+}
+
+void edge_case_tests()
+{
+    printf("\n=== Testing Edge Cases ===\n");
+
+    // test Case 1: NULL and zero-size tests
+    umeminit(4096, BEST_FIT);
+
+    void *null_free_test = NULL;
+    ufree(null_free_test); // Should handle NULL gracefully
+
+    void *zero_alloc = umalloc(0); // Should handle zero size
+
+    void *null_realloc = urealloc(NULL, 100); // Should act like malloc
+
+    urealloc(null_realloc, 0); // Should act like free
+
+    // test Case 2: Alignment tests
+    void *ptr1 = umalloc(3);
+    void *ptr2 = umalloc(7);
+    void *ptr3 = umalloc(8);
+    void *ptr4 = umalloc(9);
+
+    // test Case 3: Realloc edge cases
+    void *realloc_ptr = umalloc(100);
+
+    // Grow the block
+    realloc_ptr = urealloc(realloc_ptr, 200);
+
+    // Shrink the block
+    realloc_ptr = urealloc(realloc_ptr, 50);
+
+    // Grow to a size that forces a new allocation
+    realloc_ptr = urealloc(realloc_ptr, 1000);
+
+    // test Case 4: Boundary conditions
+    void *max_alloc = umalloc(4000); // Nearly max size
+
+    void *should_fail = umalloc(4096); // Should fail - too large
+
+    // Print final stats
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n");
+    printf("=========================================");
+    printf("\n");
+}
+
+void fragmentation_test()
+{
+    printf("\n=== Testing Fragmentation Handling ===\n");
+    umeminit(4096, BEST_FIT);
+
+    // Create a pattern of alternating small and large allocations
+    void *ptrs[10];
+    for (int i = 0; i < 10; i++)
+    {
+        if (i % 2 == 1)
+        {
+            ptrs[i] = umalloc(64);
+        }
+        else
+        {
+            ptrs[i] = umalloc(256);
+        }
+    }
+
+    // Free every other block to create fragmentation
+    for (int i = 0; i < 10; i += 2)
+    {
+        ufree(ptrs[i]);
+    }
+
+    // try to allocate a large block that should fail due to fragmentation
+    void *large_fail = umalloc(512);
+
+    // Print stats to see fragmentation
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+
+    // Now free everything and try again
+    for (int i = 1; i < 10; i += 2)
+    {
+        ufree(ptrs[i]);
+    }
+
+    large_fail = umalloc(512); // Should succeed now
+
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n");
+    printf("=========================================");
+    printf("\n");
+}
+
+void realloc_stress_test()
+{
+    printf("\n=== Testing Realloc Stress Cases ===\n");
+    umeminit(4096, BEST_FIT);
+
+    // test 1: Growing and shrinking same block repeatedly
+    void *ptr = umalloc(64);
+
+    for (int i = 0; i < 5; i++)
+    {
+        ptr = urealloc(ptr, 128 * (i + 1)); // Grow
+        ptr = urealloc(ptr, 64);            // Shrink back
+    }
+
+    // test 2: Realloc between existing blocks
+    void *blocks[3];
+    blocks[0] = umalloc(128);
+    blocks[1] = umalloc(256);
+    blocks[2] = umalloc(128);
+
+    // Free middle block and try to realloc first block into that space
+    ufree(blocks[1]);
+    blocks[0] = urealloc(blocks[0], 384); // Should use middle space
+
+    printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
+    printf("\n");
+    printf("=========================================");
+    printf("\n");
+}
+
+void double_free_test()
+{
+    umeminit(4096, FIRST_FIT);
+    int *ptr = umalloc(20);
+    ufree(ptr);
+    ufree(ptr); // should result in an error
+
     printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
 }
 
 int main()
 {
-    basic_first_fit_test();
+    // basic_first_fit_test();
+    // reset_values();
 
+    // intensive_first_fit_test();
+    // reset_values();
+
+    // basic_best_fit_test();
+    // reset_values();
+
+    // intensive_best_fit_test();
+    // reset_values();
+
+    // basic_next_fit_test();
+    // reset_values();
+
+    // intensive_next_fit_test();
+    // reset_values();
+
+    // next_fit_edge_test();
+    // reset_values();
+
+    // fragmentation_test();
+    // reset_values();
+
+    // realloc_stress_test();
+    // reset_values();
+
+    // edge_case_tests();
+    // reset_values();
+
+    // double_free_test();
+    basic_best_fit_test();
     return 0;
 }
-
-// int main()
-// {
-//     // Page size is 4096
-//     // float frag = calculate_fragmentation();
-//     umeminit(4096, FIRST_FIT);
-//     int *ptr = umalloc(16);
-//     int *ptr2 = umalloc(25);
-//     int *ptr3 = umalloc(100);
-//     int *ptr4 = umalloc(10);
-//     ufree(ptr2);
-//     ufree(ptr4);
-
-//     // int *ptr7 = realloc(ptr6, 25);
-//     printumemstats(num_allocs, num_deallocs, current_allocated, current_free, fragmentation);
-//     return 0;
-// }
-
-// void ufree(void *ptr)
-// {
-//     if (ptr == NULL)
-//     {
-//         return; // Handle null pointer case
-//     }
-
-//     // Assuming `header_t` is defined as in your `umem.h` and is placed before the allocated memory
-//     header_t *start_of_header = (header_t *)((char *)ptr - sizeof(header_t));
-
-//     // Get the size from the header
-//     size_t size_to_free = start_of_header->size;
-
-//     // Update the bytes freed
-//     current_free += size_to_free;
-//     current_allocated -= size_to_free;
-//     num_deallocs += 1;
-
-//     // Add freed block back to the free list
-//     // node_t *free_block = list_head;
-//     node_t *free_block = (node_t *)((char *)ptr - sizeof(node_t)); // Pointer to the free block header
-//     printf("Free_block size: %zu\n", free_block->size);
-//     node_t *check_addr = ((char *)free_block + free_block->size);
-//     free_block->size = size_to_free;
-
-//     // printf("Freeing block of size %zu at address %p\n", size_to_free, start_of_header);
-
-//     node_t *current = list_head;
-//     printf("Current_block size: %zu\n", current->size);
-//     node_t *prev = NULL;
-//     // node_t *new_node = (node_t *)((char *)current + current->size);
-
-//     // Merge adjacent blocks (if any)
-//     while (current != NULL)
-//     {
-//         // Check if the current block is adjacent to the freed block (free block follows current block)
-//         if ((char *)current + current->size == (char *)free_block)
-//         {
-//             current->size += free_block->size; // Merge the blocks
-//             free_block = current;              // Update free_block to the merged block
-//             printf("Merged with previous block\n");
-//             break;
-//         }
-//         //Check if the freed block follows the current block
-//         else if ((char *)free_block + free_block->size == (char *)current)
-//         {
-//             free_block->size += current->size; // Merge the blocks
-//             if (prev != NULL)
-//                 prev->next = current->next; // Remove current block from the list
-//             printf("Merged with next block\n");
-//             continue;
-//         }
-
-//         prev = current;
-//         current = current->next;
-//     }
-
-//     if (prev == NULL)
-//     {
-//         free_block->next = list_head;
-//         list_head = free_block;
-//     }
-//     else
-//     {
-//         prev->next = free_block;
-//         free_block->next = current;
-//     }
-
-//     // Print free list after operation (for debugging purposes)
-//     calculate_fragmentation();
-//     print_free_list();
-// }
-
-// void *urealloc(void *ptr, size_t new_size)
-// {
-//     if (ptr == NULL)
-//     {
-//         // If ptr is NULL, behave like malloc (allocate a new block)
-//         return umalloc(new_size);
-//     }
-
-//     // Get the header for the current block
-//     header_t *current_header = (header_t *)((char *)ptr - sizeof(header_t));
-
-//     if (current_header->magic != MAGIC)
-//     {
-//         fprintf(stderr, "Error: Memory corruption detected at block %p\n", ptr);
-//         exit(1);
-//     }
-
-//     size_t old_size = current_header->size;
-
-//     // If the new size is smaller or equal, we can shrink or just return the pointer
-//     if (new_size <= old_size)
-//     {
-//         // If shrinking, make sure the excess space is returned to the free list
-//         if (new_size < old_size)
-//         {
-//             // Optionally split the block if there's enough free space left
-//             size_t remaining_size = old_size - new_size;
-//             if (remaining_size >= MIN_BLOCK_SIZE)
-//             {
-//                 node_t *new_free_block = (node_t *)((char *)ptr + new_size);
-//                 new_free_block->size = remaining_size;
-//                 // Insert the new block into the free list (you can use best/worst/first fit)
-//                 allocate_block(new_free_block, new_size);
-//             }
-//         }
-//         return ptr;
-//     }
-
-//     // If the new size is larger, we need to allocate a new block and copy the data
-//     void *new_ptr = umalloc(new_size);
-//     if (new_ptr == NULL)
-//     {
-//         return NULL; // If allocation failed, return NULL
-//     }
-
-//     // Copy the data from the old block to the new block manually
-//     size_t copy_size = old_size < new_size ? old_size : new_size; // Copy the smaller of the old and new sizes
-//     char *old_block = (char *)ptr;
-//     char *new_block = (char *)new_ptr;
-
-//     for (size_t i = 0; i < copy_size; ++i)
-//     {
-//         new_block[i] = old_block[i]; // Manual byte-by-byte copy
-//     }
-
-//     // Free the old block
-//     ufree(ptr);
-
-//     return new_ptr;
-// }
-
-// void *allocate_block(node_t *block, size_t size)
-// {
-//     size_t rounded_size = size + sizeof(header_t);
-//     size_t remaining_size = block->size - rounded_size;
-
-//     ((header_t *)block)->magic = MAGIC;
-
-//     // Save the next block before any modifications
-//     node_t *saved_next = block->next;
-
-//     if (remaining_size >= sizeof(node_t))
-//     {
-//         // Create new free block
-//         node_t *new_node = (node_t *)((char *)block + rounded_size);
-//         new_node->size = remaining_size;
-//         block->size = rounded_size;
-
-//         // Put new_node in the same position in the list that block was in
-//         if (list_head == block)
-//         {
-//             new_node->next = saved_next;
-//             list_head = new_node;
-//         }
-//         else
-//         {
-//             // Find the previous node
-//             node_t *prev = list_head;
-//             while (prev && prev->next != block)
-//             {
-//                 prev = prev->next;
-//             }
-//             if (prev)
-//             {
-//                 new_node->next = saved_next;
-//                 prev->next = new_node;
-//             }
-//         }
-//     }
-//     else
-//     {
-//         // No split possible, just remove the block
-//         if (list_head == block)
-//         {
-//             list_head = saved_next;
-//         }
-//         else
-//         {
-//             node_t *prev = list_head;
-//             while (prev && prev->next != block)
-//             {
-//                 prev = prev->next;
-//             }
-//             if (prev)
-//             {
-//                 prev->next = saved_next;
-//             }
-//         }
-//     }
-
-//     current_allocated += rounded_size;
-//     current_free -= rounded_size;
-//     num_allocs++;
-
-//     return (void *)((char *)block + sizeof(header_t));
-// }
