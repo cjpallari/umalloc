@@ -18,19 +18,6 @@ long unsigned int current_free = 0;
 long unsigned int current_allocated = 0;
 float fragmentation = 0.0;
 
-void print_free_list()
-{
-    node_t *current = list_head;
-    printf("Free list: ");
-
-    while (current != NULL)
-    {
-        printf("Block of size %zu -> ", current->size);
-        current = current->next;
-    }
-    printf("NULL\n");
-}
-
 int umeminit(size_t sizeOfRegion, int algo)
 {
     if (list_head != NULL)
@@ -128,7 +115,8 @@ void *allocate_block(node_t *block, size_t size)
     }
 
     // update stats
-    current_allocated += rounded_size;
+    // it is my understanding that this should NOT include the size of the header
+    current_allocated += size; // update with "actual" bytes returned to user
     current_free -= rounded_size;
     num_allocs++;
 
@@ -268,7 +256,6 @@ void *next(size_t size)
 
     do
     {
-
         // checking to see what the last allocation was
         // if the current block is big enough for our request
         if (current->size >= required_size)
@@ -346,6 +333,8 @@ float calculate_fragmentation()
     node_t *current = list_head;
     size_t largest_free = 0;
     size_t mem_in_small_blocks = 0;
+
+    //  find the largest free block
     while (current != NULL)
     {
         if (largest_free < current->size)
@@ -355,8 +344,11 @@ float calculate_fragmentation()
         current = current->next;
     }
 
+    // set threshold for small blocks
     size_t small_block_def = largest_free / 2;
     current = list_head;
+
+    // calculate fragmentation
     while (current != NULL)
     {
         if (current->size < small_block_def)
@@ -392,28 +384,31 @@ void validate_free_ptr(void *ptr, header_t *header)
 void update_free_stats(size_t size_to_free)
 {
     current_free += size_to_free;
-    current_allocated -= size_to_free;
+    // current_allocated -= size_to_free;
+    current_allocated -= (size_to_free - sizeof(header_t)); // update with "actual" bytes returned to user
     num_deallocs += 1;
 }
 
 void merge_with_next_blocks(node_t *current)
 {
+    // iterate through the free list and merge with the next block if possible
     while (current->next != NULL &&
            (char *)current + current->size == (char *)current->next)
     {
-        current->size += current->next->size;
-        current->next = current->next->next;
+        current->size += current->next->size; // merge the two blocks
+        current->next = current->next->next;  // set the next pointer to the next next block
     }
 }
 
 void insert_block(node_t *free_block, node_t *current, node_t *prev)
 {
+    // insert the block in the free list in address order
     if (prev == NULL)
     {
         free_block->next = list_head;
         list_head = free_block;
     }
-    else
+    else // insert in the middle
     {
         prev->next = free_block;
         free_block->next = current;
@@ -422,6 +417,7 @@ void insert_block(node_t *free_block, node_t *current, node_t *prev)
 
 node_t *init_free_block(header_t *header, size_t size)
 {
+    // initialize a free block
     node_t *free_block = (node_t *)header;
     free_block->size = size;
     free_block->next = NULL;
@@ -430,12 +426,15 @@ node_t *init_free_block(header_t *header, size_t size)
 
 void ufree(void *ptr)
 {
+    // if ptr is NULL, return
     if (ptr == NULL)
         return;
 
+    // get the header for the current block
     header_t *header = (header_t *)((char *)ptr - sizeof(header_t));
     validate_free_ptr(ptr, header);
 
+    // check if the block is already in the free list
     node_t *check = list_head;
     while (check != NULL)
     {
@@ -447,11 +446,14 @@ void ufree(void *ptr)
         check = check->next;
     }
 
+    // get the size of the block to free
     size_t size_to_free = header->size;
     update_free_stats(size_to_free);
 
+    // initialize a free block
     node_t *free_block = init_free_block(header, size_to_free);
 
+    // if the free list is empty, add the block to the head
     if (list_head == NULL)
     {
         list_head = free_block;
@@ -463,6 +465,7 @@ void ufree(void *ptr)
     node_t *current = list_head;
     node_t *prev = NULL;
 
+    // iterate through the free list
     while (current != NULL)
     {
         // Check if we can merge with the previous block
@@ -524,6 +527,7 @@ void ufree(void *ptr)
 
 void validate_realloc_ptr(void *ptr, header_t *header)
 {
+    // magic number check
     if (header->magic != MAGIC)
     {
         fprintf(stderr, "Error: Memory corruption detected at block %p\n", ptr);
@@ -533,11 +537,13 @@ void validate_realloc_ptr(void *ptr, header_t *header)
 
 void shrink_block(header_t *current_header, size_t aligned_new_size, size_t old_size)
 {
+    // get the new free block
     node_t *new_free_block = (node_t *)((char *)current_header + aligned_new_size);
     new_free_block->size = old_size - aligned_new_size;
     new_free_block->next = NULL;
     current_header->size = aligned_new_size;
 
+    // update stats
     current_allocated -= new_free_block->size;
     current_free += new_free_block->size;
 
@@ -547,7 +553,7 @@ void shrink_block(header_t *current_header, size_t aligned_new_size, size_t old_
         new_free_block->next = list_head;
         list_head = new_free_block;
     }
-    else
+    else // insert in the middle
     {
         node_t *current = list_head;
         while (current->next != NULL &&
@@ -562,11 +568,13 @@ void shrink_block(header_t *current_header, size_t aligned_new_size, size_t old_
 
 void *urealloc(void *ptr, size_t new_size)
 {
+    // if ptr is NULL, just allocate new block
     if (ptr == NULL)
     {
         return umalloc(new_size);
     }
 
+    // if new size is 0, free the block and return NULL
     if (new_size == 0)
     {
         ufree(ptr);
@@ -576,10 +584,10 @@ void *urealloc(void *ptr, size_t new_size)
     // get the header for the current block
     header_t *current_header = (header_t *)((char *)ptr - sizeof(header_t));
 
-    validate_realloc_ptr(ptr, current_header);
+    validate_realloc_ptr(ptr, current_header); // validate the pointer
 
     size_t old_size = current_header->size;
-    size_t aligned_new_size = ((new_size + sizeof(header_t) + 7) / 8) * 8;
+    size_t aligned_new_size = ((new_size + sizeof(header_t) + 7) / 8) * 8; // 8 byte alignment
 
     // if the new size is smaller or equal, we can shrink or just return the pointer
     if (aligned_new_size <= old_size)
@@ -587,7 +595,7 @@ void *urealloc(void *ptr, size_t new_size)
         // shrinking the block
         if (aligned_new_size + sizeof(node_t) <= old_size)
         {
-            shrink_block(current_header, aligned_new_size, old_size);
+            shrink_block(current_header, aligned_new_size, old_size); // shrink the block
         }
         return ptr;
     }
@@ -615,7 +623,7 @@ void *urealloc(void *ptr, size_t new_size)
             char *restore_data = (char *)restored_ptr;
             for (size_t i = 0; i < old_size - sizeof(header_t); i++)
             {
-                restore_data[i] = saved_data[i];
+                restore_data[i] = saved_data[i]; // restore the data
             }
         }
         return restored_ptr;
@@ -625,12 +633,13 @@ void *urealloc(void *ptr, size_t new_size)
     char *new_data = (char *)new_ptr;
     for (size_t i = 0; i < old_size - sizeof(header_t); i++)
     {
-        new_data[i] = saved_data[i];
+        new_data[i] = saved_data[i]; // copy the data
     }
 
     return new_ptr;
 }
 
+// reset memory allocation stats
 void reset_values()
 {
     num_allocs = 0;
