@@ -293,10 +293,15 @@ void *next(size_t size)
 void *umalloc(size_t size)
 {
     void *allocated_memory = NULL;
+<<<<<<< HEAD
     // 8 byte alignment
     size_t aligned_size = ((size + 7) / 8) * 8;
 
     if (aligned_size == 0) // handle 0 size
+=======
+
+    if (size == 0) // handle 0 size
+>>>>>>> afbf9b4... umalloc final
     {
         return NULL;
     }
@@ -305,6 +310,7 @@ void *umalloc(size_t size)
     switch (allocationAlgo)
     {
     case BEST_FIT:
+<<<<<<< HEAD
         allocated_memory = best(aligned_size);
         break;
     case WORST_FIT:
@@ -315,6 +321,18 @@ void *umalloc(size_t size)
         break;
     case NEXT_FIT:
         allocated_memory = next(aligned_size);
+=======
+        allocated_memory = best(size);
+        break;
+    case WORST_FIT:
+        allocated_memory = worst(size);
+        break;
+    case FIRST_FIT:
+        allocated_memory = first(size);
+        break;
+    case NEXT_FIT:
+        allocated_memory = next(size);
+>>>>>>> afbf9b4... umalloc final
         break;
     default:
         return NULL;
@@ -587,6 +605,7 @@ void *urealloc(void *ptr, size_t new_size)
     validate_realloc_ptr(ptr, current_header); // validate the pointer
 
     size_t old_size = current_header->size;
+<<<<<<< HEAD
     size_t aligned_new_size = ((new_size + sizeof(header_t) + 7) / 8) * 8; // 8 byte alignment
 
     // if the new size is smaller or equal, we can shrink or just return the pointer
@@ -596,6 +615,18 @@ void *urealloc(void *ptr, size_t new_size)
         if (aligned_new_size + sizeof(node_t) <= old_size)
         {
             shrink_block(current_header, aligned_new_size, old_size); // shrink the block
+=======
+    // size_t aligned_new_size = ((new_size + sizeof(header_t) + 7) / 8) * 8; // 8 byte alignment
+    size_t required_size = new_size + sizeof(header_t);
+
+    // if the new size is smaller or equal, we can shrink or just return the pointer
+    if (required_size <= old_size)
+    {
+        // shrinking the block
+        if (required_size + sizeof(node_t) <= old_size)
+        {
+            shrink_block(current_header, required_size, old_size); // shrink the block
+>>>>>>> afbf9b4... umalloc final
         }
         return ptr;
     }

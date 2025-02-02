@@ -4,6 +4,33 @@
 
 void basic_first_fit_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: basic_first_fit_test
+     * ----------------------------
+     * tests the basic functionality of the first-fit allocation algorithm.
+     *
+     * test cases:
+     * 1. allocates three blocks of decreasing size to test basic allocation
+     *    - tests if first-fit properly finds the first available space
+     *    - verifies proper block splitting and alignment
+     *
+     * 2. frees all blocks in order to test deallocation
+     *    - tests if blocks are properly returned to free list
+     *    - verifies coalescing of adjacent free blocks
+     *
+     * 3. allocates two new blocks after freeing
+     *    - tests if freed space can be reused
+     *    - verifies that allocator finds first suitable block
+     *    - final allocated memory should be 384 bytes (user space only)
+     *
+     * expected behavior:
+     * - should maintain proper alignment (8-byte)
+     * - should properly track allocated vs free memory
+     * - should show 0% fragmentation when blocks are contiguous
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Testing FIRST_FIT Algorithm ===\n");
     umeminit(4096, FIRST_FIT);
 
@@ -31,6 +58,34 @@ void basic_first_fit_test()
 
 void intensive_first_fit_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: intensive_first_fit_test
+     * ----------------------------
+     * stress tests the first-fit allocator with odd sizes and complex patterns.
+     *
+     * test cases:
+     * 1. multiple allocations with odd sizes
+     *    - tests handling of non-power-of-2 sizes
+     *    - tests alignment with irregular sizes
+     *    - verifies proper padding
+     *
+     * 2. realloc operations with odd sizes
+     *    - tests block resizing with unusual sizes
+     *    - verifies data preservation during realloc
+     *
+     * 3. mixed allocation and free pattern
+     *    - tests fragmentation handling
+     *    - verifies proper block reuse
+     *    - tests coalescing under complex conditions
+     *
+     * expected behavior:
+     * - should handle odd sizes with proper alignment
+     * - should maintain free list integrity during complex operations
+     * - should properly coalesce blocks when possible
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Intensive Testing of FIRST_FIT Algorithm ===\n");
     umeminit(4096, FIRST_FIT);
 
@@ -88,6 +143,32 @@ void intensive_first_fit_test()
 
 void basic_best_fit_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: basic_best_fit_test
+     * ----------------------------
+     * tests the fundamental operations of the best-fit allocation strategy.
+     *
+     * test cases:
+     * 1. sequential allocations of varying sizes
+     *    - tests if best-fit chooses optimal blocks
+     *    - verifies block splitting behavior
+     *
+     * 2. strategic block freeing
+     *    - creates specific hole sizes to test selection
+     *    - verifies proper block choice among multiple options
+     *
+     * 3. allocation after freeing
+     *    - tests if allocator chooses most suitable blocks
+     *    - verifies minimal space wastage
+     *
+     * expected behavior:
+     * - should select smallest suitable block for each request
+     * - should minimize internal fragmentation
+     * - should maintain proper block linkage
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("=== Testing BEST_FIT Algorithm ===\n");
     umeminit(4096, BEST_FIT);
 
@@ -116,6 +197,32 @@ void basic_best_fit_test()
 
 void basic_next_fit_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: basic_next_fit_test
+     * ----------------------------
+     * tests the basic functionality of the next-fit allocation strategy.
+     *
+     * test cases:
+     * 1. sequential allocations
+     *    - tests if allocator properly tracks last position
+     *    - verifies correct advancement through free list
+     *
+     * 2. mixed free operations
+     *    - tests coalescing of adjacent blocks
+     *    - verifies proper next-position updates after frees
+     *
+     * 3. wrap-around allocations
+     *    - tests if allocator properly wraps to list start
+     *    - verifies correct position tracking after wrap
+     *
+     * expected behavior:
+     * - should maintain correct 'last position' pointer
+     * - should properly wrap around to list start
+     * - should coalesce blocks when possible
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Testing NEXT_FIT Algorithm ===\n");
     umeminit(4096, NEXT_FIT);
 
@@ -148,6 +255,34 @@ void basic_next_fit_test()
 
 void intensive_best_fit_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: intensive_best_fit_test
+     * ----------------------------
+     * stress tests the best-fit allocator with challenging allocation patterns.
+     *
+     * test cases:
+     * 1. multiple allocations with odd sizes
+     *    - tests handling of prime numbers and odd sizes
+     *    - verifies alignment with irregular requests
+     *    - tests memory utilization with varied sizes
+     *
+     * 2. strategic free operations
+     *    - creates specific fragmentation patterns
+     *    - tests ability to find best fits in fragmented memory
+     *
+     * 3. realloc with size changes
+     *    - tests block resizing with different size changes
+     *    - verifies proper block reuse and splitting
+     *    - tests data preservation during reallocation
+     *
+     * expected behavior:
+     * - should handle odd-sized allocations efficiently
+     * - should maintain optimal block selection under fragmentation
+     * - should properly track memory usage statistics
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Intensive Testing of BEST_FIT Algorithm ===\n");
     umeminit(4096, BEST_FIT);
 
@@ -193,6 +328,32 @@ void intensive_best_fit_test()
 
 void next_fit_edge_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: next_fit_edge_test
+     * ----------------------------
+     * tests boundary conditions and edge cases of next-fit allocation.
+     *
+     * test cases:
+     * 1. near-capacity allocations
+     *    - fills most of memory leaving small gaps
+     *    - tests behavior when space is highly constrained
+     *
+     * 2. strategic middle block free
+     *    - tests allocation behavior with fragmented space
+     *    - verifies proper handling of larger requests
+     *
+     * 3. final space allocation
+     *    - tests allocator's behavior with minimal remaining space
+     *    - verifies proper handling of failed allocations
+     *
+     * expected behavior:
+     * - should handle near-full memory conditions
+     * - should properly track available space
+     * - should maintain correct next-fit position under stress
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Testing NEXT_FIT Edge Cases ===\n");
     umeminit(4096, NEXT_FIT);
 
@@ -223,6 +384,35 @@ void next_fit_edge_test()
 
 void intensive_next_fit_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: intensive_next_fit_test
+     * ----------------------------
+     * thoroughly tests next-fit allocator with complex allocation patterns.
+     *
+     * test cases:
+     * 1. odd-sized allocations
+     *    - tests handling of non-standard sizes
+     *    - verifies alignment with irregular requests
+     *    - tests memory utilization
+     *
+     * 2. mixed free operations
+     *    - creates specific fragmentation patterns
+     *    - tests position tracking after frees
+     *    - verifies proper wrap-around behavior
+     *
+     * 3. repeated allocation after frees
+     *    - tests block reuse patterns
+     *    - verifies position advancement
+     *    - tests coalescing under complex conditions
+     *
+     * expected behavior:
+     * - should maintain correct position tracking
+     * - should handle odd sizes with proper alignment
+     * - should show efficient space reuse
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Intensive Testing of NEXT_FIT Algorithm ===\n");
     umeminit(4096, NEXT_FIT);
 
@@ -264,6 +454,37 @@ void intensive_next_fit_test()
 
 void edge_case_tests()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: edge_case_tests
+     * ----------------------------
+     * tests various edge cases and boundary conditions across allocation methods.
+     *
+     * test cases:
+     * 1. null and zero-size handling
+     *    - tests null pointer handling in free
+     *    - verifies zero-size allocation behavior
+     *    - tests null pointer handling in realloc
+     *
+     * 2. alignment verification
+     *    - tests 8-byte alignment with various sizes
+     *    - verifies proper padding
+     *
+     * 3. realloc edge cases
+     *    - tests growing and shrinking blocks
+     *    - verifies behavior with large size changes
+     *
+     * 4. boundary testing
+     *    - tests allocations near memory region limits
+     *    - verifies proper handling of failed allocations
+     *
+     * expected behavior:
+     * - should handle all edge cases gracefully
+     * - should maintain alignment requirements
+     * - should properly handle error conditions
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Testing Edge Cases ===\n");
 
     // test Case 1: NULL and zero-size tests
@@ -310,6 +531,31 @@ void edge_case_tests()
 
 void fragmentation_test()
 {
+<<<<<<< HEAD
+=======
+    /* function: fragmentation_test
+     * ----------------------------
+     * specifically tests memory fragmentation handling and measurement.
+     *
+     * test cases:
+     * 1. alternating allocation sizes
+     *    - creates pattern of small and large blocks
+     *    - tests fragmentation calculation
+     *
+     * 2. strategic free pattern
+     *    - creates intentional fragmentation
+     *    - tests allocation in fragmented space
+     *
+     * 3. defragmentation test
+     *    - tests coalescing effectiveness
+     *    - verifies fragmentation measurement
+     *
+     * expected behavior:
+     * - should accurately measure fragmentation
+     * - should handle fragmented allocation attempts
+     * - should properly coalesce when possible
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Testing Fragmentation Handling ===\n");
     umeminit(4096, BEST_FIT);
 
@@ -355,6 +601,30 @@ void fragmentation_test()
 
 void realloc_stress_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: realloc_stress_test
+     * ----------------------------
+     * tests realloc functionality under various conditions.
+     *
+     * test cases:
+     * 1. repeated grow/shrink cycles
+     *    - tests repeated resizing of same block
+     *    - verifies memory content preservation
+     *    - tests fragmentation handling
+     *
+     * 2. realloc between blocks
+     *    - tests realloc with surrounding allocations
+     *    - verifies proper space reuse
+     *    - tests coalescing during realloc
+     *
+     * expected behavior:
+     * - should preserve data during realloc
+     * - should efficiently handle size changes
+     * - should maintain proper block organization
+     */
+>>>>>>> afbf9b4... umalloc final
     printf("\n=== Testing Realloc Stress Cases ===\n");
     umeminit(4096, BEST_FIT);
 
@@ -385,6 +655,25 @@ void realloc_stress_test()
 
 void double_free_test()
 {
+<<<<<<< HEAD
+=======
+    /*
+     * function: double_free_test
+     * ----------------------------
+     * tests detection and handling of double free attempts.
+     *
+     * test cases:
+     * 1. basic double free
+     *    - allocates and frees same block twice
+     *    - tests error detection
+     *    - verifies proper error handling
+     *
+     * expected behavior:
+     * - should detect double free attempt
+     * - should exit with error message
+     * - should prevent memory corruption
+     */
+>>>>>>> afbf9b4... umalloc final
     umeminit(4096, FIRST_FIT);
     int *ptr = umalloc(20);
     ufree(ptr);
